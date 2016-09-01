@@ -1,6 +1,8 @@
 using Plots, ForwardDiff
 pyplot(size=(600,600*3/4), reuse=true, grid=false)
 
+include("goldensearch.jl")
+
 function linesearch_armijo(f, x, v, tol=1e-6)
   ϕ(t) = f(x + t*v)
   dϕ(t) = ForwardDiff.derivative(ϕ, t)
@@ -32,7 +34,7 @@ function cauchy(f, x; tol=1e-2, maxiter=1000)
   ∇f(x) = ForwardDiff.gradient(f, x)
   iter = 1
   while norm(∇f(x)) > tol && iter <= maxiter
-    t = linesearch(f, x, -∇f(x))
+    t = golden_ls(f, x, -∇f(x))
     x = x - t*∇f(x)
     push!(X, x)
     iter += 1
