@@ -3,6 +3,25 @@ pyplot(size=(600,600*3/4), reuse=true, grid=false)
 
 include("goldensearch.jl")
 
+function plotcountours(f, F, lx, ux, ly, uy)
+  contour(linspace(lx,ux,200), linspace(ly,uy,200), (x,y)->f([x;y]),
+    levels=[F; 1000], leg=false)
+end
+
+function contourmodel!(m, lx, ux, ly, uy)
+  contour!(linspace(lx,ux,200), linspace(ly,uy,200), (x,y)->m([x;y]),
+    levels=50, c=:grays, leg=false)
+end
+
+function plotpointmove!(X; c=:blue)
+  n = length(X)
+  plotpoint!(X[1], c=c, name=0)
+  for i = 1:n-1
+    moveplot!(X[i], X[i+1]-X[i])
+    plotpoint!(X[i+1], c=c)
+  end
+end
+
 function plotpoint!(x; name=-1, annpos=[-0.3;0.0], c=:blue)
   scatter!([x[1]], [x[2]], c=c, ms=4)
   if !(typeof(name) <: Number) || name >= 0
@@ -29,20 +48,18 @@ end
 function saveimg(k, lx, ux, ly, uy)
   xlims!(lx, ux)
   ylims!(ly, uy)
-  png(@sprintf("cauchy-steps-%03d", k))
+  png(@sprintf("newton-steps-%03d", k))
   return k+1
 end
 
-function foo(;all_levels=true)
+function foo(;all_levels=false)
   #f(x) = 0.05*( (x[1]-2)^2 + 4*(x[2]-1.5)^2 )
-  #x = zeros(2)
-  #lx, ux, ly = -1.2, 6.3, -1.2
   #f(x) = (1-x[1])^2 + 100*(x[2]-x[1]^2)^2
-  f(x) = 0.1*( 0.8*(x[1]-3)^2 - (x[2]-1)^3 - 0.1*x[1] + x[2] )
-  sc = 0.01
+  f(x) = 0.8*(x[1]-3)^2 - (x[2]-1)^3 - 0.1*x[1] + x[2]
   x = [-2.5; 0.0]
   lx, ux, ly = -3.2, 6.3, -1.2
   ∇f(x) = ForwardDiff.gradient(f, x)
+  H(x) = ForwardDiff.hessian(f, x)
 
   uy = ly + 3(ux-lx)/4
 
@@ -58,40 +75,47 @@ function foo(;all_levels=true)
   imgc = 1
   if all_levels
     contour(linspace(lx,ux,200), linspace(ly,uy,200), (x,y)->f([x;y]),
-      levels=linspace(minf, maxf, 40), leg=false)
+      levels=linspace(minf, maxf, 20), leg=false)
   else
     #=
     contour(linspace(lx,ux,200), linspace(ly,uy,200), (x,y)->f([x;y]),
       c=:grays, levels=linspace(minf, maxf, 20), leg=false)
     plotpoint!([-10;-10])
     imgc = saveimg(imgc, lx, ux, ly, uy)
-    =#
     contour(linspace(lx,ux,200), linspace(ly,uy,200), (x,y)->f([x;y]),
       levels=[f(x)], leg=false)
+    =#
   end
   X = Any[x]
+  F = [f(x)]
 
   # One image of the point alone
-  plotpoint!(x, name=0)
-  imgc = saveimg(imgc, lx, ux, ly, uy)
-  # One image of the gradient
-  gradplot!(x, ∇f, name=0)
-  imgc = saveimg(imgc, lx, ux, ly, uy)
-  traceplot!(x, -∇f(x)*5)
-  imgc = saveimg(imgc, lx, ux, ly, uy)
   iter = 1
   ∇fx = ∇f(x)
-  while norm(∇fx) > 1e-1*sc && iter <= 10
-    t = golden_ls(f, x, -∇fx)
-    moveplot!(x, -t*∇fx)
-    x = x - t*∇fx
-    plotpoint!(x)
-    if !all_levels
-      contour!(linspace(lx,ux,200), linspace(ly,uy,200), (x,y)->f([x;y]),
-        levels=[f(x)], leg=false)
-    end
+  Bx = H(x)
+  while norm(∇fx) > 1e-1 && iter <= 10
+    # plot all x and f(x) so far
+    plotcountours(f, F, lx, ux, ly, uy)
+    plotpointmove!(X)
     imgc = saveimg(imgc, lx, ux, ly, uy)
+
+    d = -Bx\∇fx
+
+    m(d) = f(x) + dot(d,∇fx) + 0.5*dot(d,Bx*d)
+    contourmodel!(y->m(y-x)-m(d), lx, ux, ly, uy)
+    imgc = saveimg(imgc, lx, ux, ly, uy)
+
+    moveplot!(x, d)
+    x = x + d
+    push!(X, x)
+    push!(F, f(x))
+    sort!(F)
+
+    plotpoint!(x)
+    imgc = saveimg(imgc, lx, ux, ly, uy)
+
     ∇fx = ∇f(x)
+    Bx = H(x)
     iter += 1
     if norm(x) > 10
       break
@@ -99,7 +123,6 @@ function foo(;all_levels=true)
   end
 
   # Now really solving (using Newton)
-  H(x) = ForwardDiff.hessian(f, x)
   while norm(∇fx) > 1e-8 && iter <= 1000
     d = -H(x)\∇fx
     if dot(d,∇fx) > -1e-8
