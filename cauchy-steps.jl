@@ -38,9 +38,9 @@ function foo(;all_levels=true)
   #x = zeros(2)
   #lx, ux, ly = -1.2, 6.3, -1.2
   #f(x) = (1-x[1])^2 + 100*(x[2]-x[1]^2)^2
-  f(x) = 0.1*( 0.8*(x[1]-3)^2 - (x[2]-1)^3 - 0.1*x[1] + x[2] )
-  sc = 0.01
-  x = [-2.5; 0.0]
+  sc = 0.1
+  f(x) = sc*( 0.8*(x[1]-3)^2 - (x[2]-1)^3 - 0.1*x[1] + x[2] )
+  x = [-2.0; 0.0]
   lx, ux, ly = -3.2, 6.3, -1.2
   ∇f(x) = ForwardDiff.gradient(f, x)
 
@@ -77,7 +77,7 @@ function foo(;all_levels=true)
   # One image of the gradient
   gradplot!(x, ∇f, name=0)
   imgc = saveimg(imgc, lx, ux, ly, uy)
-  traceplot!(x, -∇f(x)*5)
+  traceplot!(x, -∇f(x)*15)
   imgc = saveimg(imgc, lx, ux, ly, uy)
   iter = 1
   ∇fx = ∇f(x)
